@@ -19,4 +19,4 @@ Access Application on Browser `http://localhost:3000/`
 ## DevOps Pipeline
 This project will be used to practicing CICD [Continuous Integration/Continuous Deployment/Continuous Delievery]. You can find all the steps which I'll performed as part of CICD in the attached images. 
 
-![DevSecOps_Pipeline](./images/DevOps_Pipeline.jpg)
+![DevSecOps_Pipeline](./images/pipeline.jpg)

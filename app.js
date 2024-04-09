@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const app = express();
 const cors = require('cors')
 
+require('dotenv').config()
 
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, '/')));
@@ -20,7 +21,7 @@ mongoose.connect(process.env.MONGO_URI, {
     if (err) {
         console.log("error!! " + err)
     } else {
-      //  console.log("MongoDB Connection Successful")
+    //    console.log("MongoDB Connection Successful")
     }
 })
 

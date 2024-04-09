@@ -3,3 +3,5 @@ node_modules
 .talismanrc
 coverage
 test-results.xml
+.gitignore
+.env

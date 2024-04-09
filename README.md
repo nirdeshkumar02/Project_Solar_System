@@ -5,12 +5,17 @@ A simple HTML+MongoDB+NodeJS project to display Solar System and it's planets.
 For development, you will only need Node.js and NPM installed in your environement.
 
 ## Run Application in your local 
-Clone the Code Repository `https://github.com/nirdeshkumar02/Project_Solar_System.git`
-Install Dependencies using `npm install`
-Run Unit Testing `npm test`
-Run Code Coverage `npm run coverage`
-Start Application Server `npm start`
-Access Application on Browser `http://localhost:3000/`
+Clone the Code Repository `https://github.com/nirdeshkumar02/Project_Solar_System.git`.
+
+Install Dependencies using `npm install`.
+
+Run Unit Testing `npm test`.
+
+Run Code Coverage `npm run coverage`.
+
+Start Application Server `npm start`.
+
+Access Application on Browser `http://localhost:3000/`.
 
 ## Changes Required
 1. You need to provide the **MongoDB Connection URL** to connect the application with the database.

@@ -12,6 +12,9 @@ env:
   MONGO_PASSWORD: ${{secrets.MONGO_PASSWORD}}
   MONGO_CLOUD: ${{vars.MONGO_CLOUD}}
   DB_NAME: ${{vars.DB_NAME}}
+  DOCKER_USER: ${{ vars.DOCKER_USER }}
+  DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+  DOCKER_IMAGE: ${{ vars.DOCKER_IMAGE }}
 
 jobs:
   unit-testing:
@@ -19,10 +22,7 @@ jobs:
     strategy:
       matrix:
         node_version: [18, 20]
-        os: [ubuntu-latest, macos-latest]
-        exclude:
-          - node_version: 18
-            os: macos-latest
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout Repository
@@ -48,6 +48,9 @@ jobs:
 
       # we want this step should execute whether above unit testing step failed or success; We can use either If expression or continue-on-error
       # You can take ref of previous step by using steps.<id>
+    #   Difference between If: always() and continue-on-error :
+        # continue-on-error: won't mark the workflow failed if the associated step is failed. Workflow will be continue
+        # WhereAs If: always() will mark the workflow failed but the associated step will run. 
       - name: Archiving Test Files
         if: always()
         continue-on-error: true
@@ -91,3 +94,39 @@ jobs:
           name: Coverage-Test-Results
           path: coverage
           retention-days: 5
+
+  containerization:
+    name: Containerization of Application
+    runs-on: ubuntu-latest
+    needs: [unit-testing, code-coverage]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+
+      - name: Build Application Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: $DOCKER_USER/$DOCKER_IMAGE:${{ github.sha }}
+
+      - name: Test Application Docker Image
+        run: |-
+            docker images
+            docker run -d --name solar-system-app \
+              -p 3000:3000 \
+              -e MONGO_USERNAME= MONGO_USERNAME \
+              -e MONGO_PASSWORD: $MONGO_PASSWORD \
+              -e MONGO_CLOUD: $MONGO_CLOUD \
+              -e DB_NAME: $DB_NAME \
+              $DOCKER_USER/$DOCKER_IMAGE:${{ github.sha }}
+            export IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'solar-system-app)
+            echo $IP
+            echo "........Testing Image URL using wget.........."
+            wget -q -O - 127.0.0.1:3000/live | grep live

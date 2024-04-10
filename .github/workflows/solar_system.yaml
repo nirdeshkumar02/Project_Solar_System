@@ -1,7 +1,7 @@
 name: Solar System Workflow
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: null
   push:
     branches:
       - main
@@ -18,7 +18,7 @@ jobs:
     name: Unit Testing
     strategy:
       matrix:
-        node_version: [18, 19, 20]
+        node_version: [18, 20]
         os: [ubuntu-latest, macos-latest]
         exclude:
           - node_version: 18
@@ -33,18 +33,21 @@ jobs:
         with:
           node-version: ${{ matrix.node_version }}
 
+      - name: Caching NPM Dependencies to speed up workflow
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+
       - name: Installing Project Dependencies
         run: npm install
 
       - name: Unit Testing
-        id: unit_test
+        id: unit_test   # It will be helpful when we want to executed next step based on output of this step. 
         run: npm test
 
-      # In upload-artifact v3; it is possible to upload same artifact with matrix
-      # But In v4; It isn't possible as it will failed the workflow because of same artifact exist already.
-      # So either use v3; or file name should be dynamic.
-      # Also, we want this step should execute whether above unit testing step failed or success.
-      # You can take ref of previous step by using steps.unit_test
+      # we want this step should execute whether above unit testing step failed or success; We can use either If expression or continue-on-error
+      # You can take ref of previous step by using steps.<id>
       - name: Archiving Test Files
         if: always()
         continue-on-error: true
@@ -66,11 +69,18 @@ jobs:
         with:
           node-version: 18
 
+      - name: Caching NPM Dependencies to speed up workflow
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+
       - name: Installing Project Dependencies
         run: npm install
 
       # As Code Coverage will failed coz it required 90% but we got 89%;
-      # But We don't want to stop the execution if this step failed. So we can use continue-on-error or if expression
+      # But We don't want to stop the execution if this step failed.
+      # So we can use continue-on-error or if expression
       - name: Checking Code Coverage
         continue-on-error: true
         run: npm run coverage

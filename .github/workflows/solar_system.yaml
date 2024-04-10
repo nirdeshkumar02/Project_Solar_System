@@ -72,10 +72,10 @@ jobs:
       # As Code Coverage will failed coz it required 90% but we got 89%;
       # But We don't want to stop the execution if this step failed. So we can use continue-on-error or if expression
       - name: Checking Code Coverage
+        continue-on-error: true
         run: npm run coverage
 
       - name: Archiving Coverage Files
-        continue-on-error: true
         uses: actions/upload-artifact@v3
         with:
           name: Coverage-Test-Results

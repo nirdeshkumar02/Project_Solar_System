@@ -1,0 +1,46 @@
+name: Solar System Workflow
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - feature/*
+
+env:
+  MONGO_USERNAME: ${{vars.MONGO_USERNAME}}
+  MONGO_PASSWORD: ${{secrets.MONGO_PASSWORD}}
+  MONGO_CLOUD: ${{vars.MONGO_CLOUD}}
+  DB_NAME: ${{vars.DB_NAME}}
+
+jobs:
+  solar_system_cicd:
+    name: Unit Testing
+    strategy:
+      matrix:
+        node_version: [18, 19, 20]
+        os: [ubuntu-latest, macos-latest]
+        exclude:
+        - node_version: 18
+          os: macos-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: SetUp NodeJs Version ${{ matrix.node_version }} on ${{ matrix.os }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node_version }}
+
+      - name: Installing Project Dependencies
+        run: npm install
+
+      - name: Unit Testing
+        run: npm test
+
+      - name: Archiving Test Files
+        uses: actions/upload-artifact@v4
+        with:
+          name: Unit_Test_File
+          path: test-results.xml

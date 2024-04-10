@@ -14,15 +14,15 @@ env:
   DB_NAME: ${{vars.DB_NAME}}
 
 jobs:
-  solar_system_cicd:
+  unit-testing:
     name: Unit Testing
     strategy:
       matrix:
         node_version: [18, 19, 20]
         os: [ubuntu-latest, macos-latest]
         exclude:
-        - node_version: 18
-          os: macos-latest
+          - node_version: 18
+            os: macos-latest
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout Repository
@@ -37,13 +37,47 @@ jobs:
         run: npm install
 
       - name: Unit Testing
+        id: unit_test
         run: npm test
 
-# In upload-artifact v3; it is possible to upload same artifact with matrix
-# But In v4; It isn't possible as it will failed the workflow because of same artifact exist already. 
-# So either use v3; or file name should be dynamic. 
+      # In upload-artifact v3; it is possible to upload same artifact with matrix
+      # But In v4; It isn't possible as it will failed the workflow because of same artifact exist already.
+      # So either use v3; or file name should be dynamic.
+      # Also, we want this step should execute whether above unit testing step failed or success.
+      # You can take ref of previous step by using steps.unit_test
       - name: Archiving Test Files
+        if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v3
         with:
           name: Mocha-Test-Result
           path: test-results.xml
+          retention-days: 5
+
+  code-coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: SetUp NodeJs Version - 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Installing Project Dependencies
+        run: npm install
+
+      # As Code Coverage will failed coz it required 90% but we got 89%;
+      # But We don't want to stop the execution if this step failed. So we can use continue-on-error or if expression
+      - name: Checking Code Coverage
+        run: npm run coverage
+
+      - name: Archiving Coverage Files
+        continue-on-error: true
+        uses: actions/upload-artifact@v3
+        with:
+          name: Coverage-Test-Results
+          path: coverage
+          retention-days: 5

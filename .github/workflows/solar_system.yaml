@@ -40,7 +40,7 @@ jobs:
         run: npm test
 
       - name: Archiving Test Files
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
-          name: Unit_Test_File
+          name: Mocha-Test-Result
           path: test-results.xml

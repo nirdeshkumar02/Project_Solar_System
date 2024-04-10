@@ -39,8 +39,11 @@ jobs:
       - name: Unit Testing
         run: npm test
 
+# In upload-artifact v3; it is possible to upload same artifact with matrix
+# But In v4; It isn't possible as it will failed the workflow because of same artifact exist already. 
+# So either use v3; or file name should be dynamic. 
       - name: Archiving Test Files
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: Mocha-Test-Result
           path: test-results.xml

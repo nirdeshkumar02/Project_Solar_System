@@ -12,9 +12,9 @@ app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, '/')));
 app.use(cors())
 
-mongoose.connect(process.env.MONGO_URI, {
-    user: process.env.MONGO_USERNAME,
-    pass: process.env.MONGO_PASSWORD,
+const connectionString = `mongodb+srv://${process.env.MONGO_USERNAME}:${process.env.MONGO_PASSWORD}@${process.env.MONGO_CLOUD}/${process.env.DB_NAME}`
+
+mongoose.connect(connectionString, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 }, function(err) {

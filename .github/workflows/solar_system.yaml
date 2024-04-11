@@ -123,10 +123,10 @@ jobs:
             docker images
             docker run -d --name solarsystem \
               -p 3000:3000 \
-              -e MONGO_USERNAME=MONGO_USERNAME \
-              -e MONGO_PASSWORD=$MONGO_PASSWORD \
-              -e MONGO_CLOUD=$MONGO_CLOUD \
-              -e DB_NAME=$DB_NAME \
+              -e MONGO_USERNAME=${{ env.MONGO_USERNAME }} \
+              -e MONGO_PASSWORD=${{ env.MONGO_PASSWORD }} \
+              -e MONGO_CLOUD=${{ env.MONGO_CLOUD }} \
+              -e DB_NAME=${{ env.DB_NAME }} \
               ${{ env.DOCKER_USER }}/${{ env.DOCKER_IMAGE }}:${{ github.sha }}
             export IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'solar-system-app)
             echo $IP

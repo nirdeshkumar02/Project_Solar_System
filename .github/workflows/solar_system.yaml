@@ -97,10 +97,12 @@ jobs:
           path: coverage
           retention-days: 5
 
-  containerization:
+  docker:
     name: Containerization of Application
     runs-on: ubuntu-latest
     needs: [unit-testing, code-coverage]
+    permissions:  # To push image on Github Container Registry; By Default we have read permission includes in GITHUB_TOKEN
+      packages: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -110,6 +112,13 @@ jobs:
         with:
           username: ${{ env.DOCKER_USER }}
           password: ${{ env.DOCKER_PASS }}
+
+      - name: Login to Github Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Application Docker Image
         uses: docker/build-push-action@v5
@@ -133,9 +142,18 @@ jobs:
           echo "........Testing Image URL using wget.........."
           wget -q -O - 127.0.0.1:3000/live | grep live
 
-      - name: Push Application Docker Image
+      - name: Push Application Docker Image to DockerHub
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ${{ env.DOCKER_USER }}/${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+
+      - name: Push Application Docker Image to Github Registry
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |-
+            ${{ env.DOCKER_USER }}/${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/${{ env.DOCKER_IMAGE }}:${{ github.sha }}

@@ -18,6 +18,8 @@ env:
   DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
   DOCKER_IMAGE: ${{ vars.DOCKER_IMAGE }}
 
+
+  
 jobs:
   unit-testing:
     name: Unit Testing
@@ -156,3 +158,177 @@ jobs:
           tags: |-
             ${{ env.DOCKER_USER }}/${{ env.DOCKER_IMAGE }}:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+
+  dev-deploy:
+    if: contains(github.ref, 'feature/')
+    name: Deployed to Dev Enviroment
+    needs: docker
+    # It takes the ref of development/prod level envs for this job. 
+    # You need to create ENV in github setting with their associated env
+    # Like prod envs will be different from dev envs. 
+    environment: 
+      name: development
+      url: https://${{ steps.set_ingress_host.outputs.APP_INGRESS_HOST }}
+    # Output is helpfull in passing value from one job to another job
+    outputs:
+      APP_INGRESS_URL: ${{ steps.set_ingress_host.outputs.APP_INGRESS_HOST }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Kubectl CLI
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "v1.26.0"
+
+        # To deploy on k8s; Kubeconfig as github secret required
+      - name: Set K8s Context with KubeConfig
+        uses: azure/k8s-set-context@v4
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBECONFIG }}
+
+      # Fetching k8s ingress controller ip and saving to $GITHUB_ENV to use in furthur steps under same jobs.
+      - name: Fetch and Save K8s Ingress Controller IP
+        run: |-
+          echo ".....Ingress Controller External IP....."
+          echo "INGRESS_IP=$(kubectl -n ingress-nginx get services ingress-nginx-controller -o jsonpath="{.status.loadBalancer.ingress[0].ip}")" >> $GITHUB_ENV
+
+      - name: Replace envs in K8s Menifest files
+        uses: cschleiden/replace-tokens@v1
+        with:
+          tokenPrefix: "${"
+          tokenSuffix: "}"
+          files: '["kubernetes/development/*.yaml"]'
+        env:
+          NAMESPACE: ${{ vars.NAMESPACE }}
+          REPLICAS: ${{ vars.REPLICAS }}
+          K8S_IMAGE: ${{ env.DOCKER_USER }}/${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+          INGRESS_IP: ${{ env.INGRESS_IP }}
+
+      - name: Check Deployment Files with ENVs Updates
+        run: cat kubernetes/development/*.yaml
+
+    # Here; you need to create tls self signed certficate for create below secret used in ingress service. 
+      - name: Create Requierd Secrets 
+        run: |-
+          kubectl -n ${{ vars.NAMESPACE }} create secret generic mongo-db-creds \
+            --from-literal=MONGO_URI=${{ env.MONGO_URI }} \
+            --from-literal=MONGO_USERNAME=${{ env.MONGO_USERNAME }} \
+            --from-literal=MONGO_PASSWORD=${{ env.MONGO_PASSWORD }}
+          kubectl create secret tls ingress-local-tls \
+            --namespace ${{ vars.NAMESPACE }} \
+            --key server.key \
+            --cert server.crt
+      
+      - name: Deploy menifests files to dev env
+        run: |-
+          kubectl apply -f kubernetes/development
+
+      - name: Set Ingress Endpoint for Application
+        id: set_ingress_host
+        run: |-
+          echo "APP_INGRESS_HOST=$(kubectl -n ${{ vars.NAMESPACE }} get ingress -o jsonpath="{.items[0].spec.tls[0].hosts[0]}")" >> $GITHUB_OUTPUT
+ 
+  dev-integration-testing:
+    if: contains(github.ref, 'feature/')
+    name: Dev Integration Testing
+    needs: dev-deploy
+    runs-on: ubuntu-latest
+    # Taking value from earlier job
+    env:
+      URL: ${{ needs.dev-deploy.outputs.APP_INGRESS_URL }}
+    steps:
+      - name: Test URL Output using CURL and JQ
+        run: |-
+          echo $URL 
+          echo "......................"
+          curl https://$URL/live -s -k | jq -r .status | grep -i live
+
+  prod-deploy:
+    if: github.ref == 'refs/heads/main'
+    name: Deployed to Production Env
+    needs: docker
+    # It takes the ref of development/prod level envs for this job. 
+    # You need to create ENV in github setting with their associated env
+    # Like prod envs will be different from dev envs. 
+    environment: 
+      name: production
+      url: https://${{ steps.set_ingress_host.outputs.APP_INGRESS_HOST }}
+    # Output is helpfull in passing value from one job to another job
+    outputs:
+      APP_INGRESS_URL: ${{ steps.set_ingress_host.outputs.APP_INGRESS_HOST }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Kubectl CLI
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "v1.26.0"
+
+        # To deploy on k8s; Kubeconfig as github secret required
+      - name: Set K8s Context with KubeConfig
+        uses: azure/k8s-set-context@v4
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBECONFIG }}
+
+      # Fetching k8s ingress controller ip and saving to $GITHUB_ENV to use in furthur steps under same jobs.
+      - name: Fetch and Save K8s Ingress Controller IP
+        run: |-
+          echo ".....Ingress Controller External IP....."
+          echo "INGRESS_IP=$(kubectl -n ingress-nginx get services ingress-nginx-controller -o jsonpath="{.status.loadBalancer.ingress[0].ip}")" >> $GITHUB_ENV
+
+      - name: Replace envs in K8s Menifest files
+        uses: cschleiden/replace-tokens@v1
+        with:
+          tokenPrefix: "${"
+          tokenSuffix: "}"
+          files: '["kubernetes/production/*.yaml"]'
+        env:
+          NAMESPACE: ${{ vars.NAMESPACE }}
+          REPLICAS: ${{ vars.REPLICAS }}
+          K8S_IMAGE: ${{ env.DOCKER_USER }}/${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+          INGRESS_IP: ${{ env.INGRESS_IP }}
+
+      - name: Check Deployment Files with ENVs Updates
+        run: cat kubernetes/production/*.yaml
+
+    # Here; you need to create tls self signed certficate for create below secret used in ingress service. 
+      - name: Create Required Secrets 
+        run: |-
+          kubectl -n ${{ vars.NAMESPACE }} create secret generic mongo-db-creds \
+            --from-literal=MONGO_URI=${{ env.MONGO_URI }} \
+            --from-literal=MONGO_USERNAME=${{ env.MONGO_USERNAME }} \
+            --from-literal=MONGO_PASSWORD=${{ env.MONGO_PASSWORD }}
+          kubectl create secret tls ingress-local-tls \
+            --namespace ${{ vars.NAMESPACE }} \
+            --key server.key \
+            --cert server.crt
+      
+      - name: Deploy menifests files to prod env
+        run: |-
+          kubectl apply -f kubernetes/production
+
+      - name: Set Ingress Endpoint for Application
+        id: set_ingress_host
+        run: |-
+          echo "APP_INGRESS_HOST=$(kubectl -n ${{ vars.NAMESPACE }} get ingress -o jsonpath="{.items[0].spec.tls[0].hosts[0]}")" >> $GITHUB_OUTPUT
+ 
+  prod-integration-testing:
+    if: github.ref == 'refs/heads/main'
+    name: Prod Integration Testing
+    needs: prod-deploy
+    runs-on: ubuntu-latest
+    # Taking value from earlier job
+    env:
+      URL: ${{ needs.prod-deploy.outputs.APP_INGRESS_URL }}
+    steps:
+      - name: Test URL Output using CURL and JQ
+        run: |-
+          echo $URL 
+          echo "......................"
+          curl https://$URL/live -s -k | jq -r .status | grep -i live

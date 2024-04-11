@@ -1,6 +1,6 @@
 # Another Workflow with Advanced Concept like Running A job with JOB CONTAINER or SERVICE CONTAINER
 
-name: Solar System Workflow
+name: Solar System Workflow - Advanced Concept running with JOB and SERVICE Containers
 
 on:
   workflow_dispatch: null

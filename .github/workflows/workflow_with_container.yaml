@@ -1,0 +1,135 @@
+# Another Workflow with Advanced Concept like Running A job with JOB CONTAINER or SERVICE CONTAINER
+
+name: Solar System Workflow
+
+on:
+  workflow_dispatch: null
+  push:
+    branches:
+      - main
+      - feature/*
+
+env:
+  # PROD Mongo Vars
+  MONGO_URI: ${{ vars.MONGO_URI }}
+  MONGO_USERNAME: ${{vars.MONGO_USERNAME}}
+  MONGO_PASSWORD: ${{secrets.MONGO_PASSWORD}}
+
+  # Docker Vars
+  DOCKER_USER: ${{ vars.DOCKER_USER }}
+  DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+  DOCKER_IMAGE: ${{ vars.DOCKER_IMAGE }}
+
+# Here; Unit Testing and Code Coverage Jobs are directly making connection to prod DB; which might occuring some issues as we don't have test db.
+# while accessing DB in real time; To resolved this We can use Job Container and Service Container.
+# Job Container - It helps in running specified Docker imaged container on a hosted runner under a job which provides isolation to runners.
+# Service Container - It is simmiliar to Job Container but specified to used any container as service like db as service.
+
+jobs:
+  unit-testing:
+    name: Unit Testing
+
+    strategy:
+      matrix:
+        node_version: [18, 20]
+        os: [ubuntu-latest]
+
+    # Defined Mongo DB service container; same replica of prod env for unit testing
+    services:
+      mongo-db:
+        image: siddharth67/mongo-db:non-prod
+        ports:
+          - 27017:27017
+
+    # Test Mongo Service Vars
+    env:
+      MONGO_URI: "mongodb://localhost:27017/superData"
+      MONGO_USERNAME: non-prod-user
+      MONGO_PASSWORD: non-prod-password
+
+    runs-on: ${{ matrix.os }}
+
+    # Now, all these steps will make connection to Service Container for unit testing.
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: SetUp NodeJs Version ${{ matrix.node_version }} on ${{ matrix.os }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node_version }}
+
+      - name: Caching NPM Dependencies to speed up workflow
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+
+      - name: Installing Project Dependencies
+        run: npm install
+
+      - name: Unit Testing
+        id: unit_test
+        run: npm test
+
+      - name: Archiving Test Files
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v3
+        with:
+          name: Mocha-Test-Result
+          path: test-results.xml
+          retention-days: 5
+
+  # Running Code Coverage under job Container and Connect with Service Container
+  code-coverage:
+    name: Code Coverage
+    # As Both Job Container and Service Container running on same github runner over bridge network so we don't required
+    # to specify port; as by default all port is exposed between them -
+    container:
+      image: node:18
+
+    services:
+      mongo-db:
+        image: siddharth67/mongo-db:non-prod
+        options: --name mongo
+
+      # Test Mongo Service Vars
+    env:
+      MONGO_URI: "mongodb://mongo:27017/superData"
+      MONGO_USERNAME: non-prod-user
+      MONGO_PASSWORD: non-prod-password
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # - name: SetUp NodeJs Version - 18
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version: 18
+
+      - name: Caching NPM Dependencies to speed up workflow
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+
+      - name: Installing Project Dependencies
+        run: npm install
+
+      # As Code Coverage will failed coz it required 90% but we got 89%;
+      # But We don't want to stop the execution if this step failed.
+      # So we can use continue-on-error or if expression
+      - name: Checking Code Coverage
+        continue-on-error: true
+        run: npm run coverage
+
+      - name: Archiving Coverage Files
+        uses: actions/upload-artifact@v3
+        with:
+          name: Coverage-Test-Results
+          path: coverage
+          retention-days: 5

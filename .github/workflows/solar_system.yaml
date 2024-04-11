@@ -128,7 +128,7 @@ jobs:
               -e MONGO_CLOUD=${{ env.MONGO_CLOUD }} \
               -e DB_NAME=${{ env.DB_NAME }} \
               ${{ env.DOCKER_USER }}/${{ env.DOCKER_IMAGE }}:${{ github.sha }}
-            export IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'solar-system-app)
+            export IP=$(docker inspect solarsystem -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'solar-system-app)
             echo $IP
             echo "........Testing Image URL using wget.........."
             wget -q -O - 127.0.0.1:3000/live | grep live

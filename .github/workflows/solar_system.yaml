@@ -8,15 +8,20 @@ on:
       - feature/*
 
 env:
-  # Mongo Vars
+  # PROD Mongo Vars
+  MONGO_URI: ${{ vars.MONGO_URI }}
   MONGO_USERNAME: ${{vars.MONGO_USERNAME}}
   MONGO_PASSWORD: ${{secrets.MONGO_PASSWORD}}
-  MONGO_CLOUD: ${{vars.MONGO_CLOUD}}
-  DB_NAME: ${{vars.DB_NAME}}
+
   # Docker Vars
   DOCKER_USER: ${{ vars.DOCKER_USER }}
   DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
   DOCKER_IMAGE: ${{ vars.DOCKER_IMAGE }}
+
+# Here; Unit Testing and Code Coverage Jobs are directly making connection to prod DB; which might occuring some issues as we don't have test db.
+# while accessing DB in real time; To resolved this We can use Job Container and Service Container.
+# Job Container - It helps in running specified Docker imaged container on a hosted runner under a job which provides isolation to runners.
+# Service Container - It is simmiliar to Job Container but specified to used any container as service like db as service.
 
 jobs:
   unit-testing:
@@ -25,7 +30,19 @@ jobs:
       matrix:
         node_version: [18, 20]
         os: [ubuntu-latest]
+    # Defined Mongo DB service container; same replica of prod env for unit testing
+    services:
+      mongo-db:
+        image: siddharth67/mongo-db:non-prod
+        ports:
+          - 27017:27017
+    # Test Mongo Service Vars
+    env:
+      MONGO_URI: 'mongodb://localhost:27017/superData'
+      MONGO_USERNAME: non-prod-user
+      MONGO_PASSWORD: non-prod-password
     runs-on: ${{ matrix.os }}
+    # Now, all these steps will make connection to Service Container for unit testing.
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -50,7 +67,7 @@ jobs:
 
       # we want this step should execute whether above unit testing step failed or success; We can use either If expression or continue-on-error
       # You can take ref of previous step by using steps.<id>
-      #   Difference between If: always() and continue-on-error :
+      # Difference between If: always() and continue-on-error :
       # continue-on-error: won't mark the workflow failed if the associated step is failed. Workflow will be continue
       # WhereAs If: always() will mark the workflow failed but the associated step will run.
       - name: Archiving Test Files
@@ -132,10 +149,9 @@ jobs:
           docker images
           docker run -d --name solarsystem \
             -p 3000:3000 \
+            -e MONGO_URI=${{ env.MONGO_URI }} \
             -e MONGO_USERNAME=${{ env.MONGO_USERNAME }} \
             -e MONGO_PASSWORD=${{ env.MONGO_PASSWORD }} \
-            -e MONGO_CLOUD=${{ env.MONGO_CLOUD }} \
-            -e DB_NAME=${{ env.DB_NAME }} \
             ${{ env.DOCKER_USER }}/${{ env.DOCKER_IMAGE }}:${{ github.sha }}
           export IP=$(docker inspect solarsystem -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
           echo $IP
@@ -157,3 +173,4 @@ jobs:
           tags: |-
             ${{ env.DOCKER_USER }}/${{ env.DOCKER_IMAGE }}:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+

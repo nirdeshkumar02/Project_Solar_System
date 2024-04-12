@@ -128,8 +128,16 @@ jobs:
           ls -ltr reports-${{ github.sha }}
 
       - name: Upload Folder to S3
-        run: |-
-          echo "Uploading to Aws S3......"
+        uses: jakejarvis/s3-sync-action@master
+        with:
+          args: --acl public-read --follow-symlinks --delete
+        env:
+          AWS_S3_BUCKET: solar-system-reports-bucket
+          AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ vars.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: 'us-east-1'
+          SOURCE_DIR: 'reports-${{ github.sha }}'
+          DEST_DIR: 'reports-${{ github.sha }}'
           
 
   docker:

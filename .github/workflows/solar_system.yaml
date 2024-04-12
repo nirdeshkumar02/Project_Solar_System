@@ -18,8 +18,6 @@ env:
   DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
   DOCKER_IMAGE: ${{ vars.DOCKER_IMAGE }}
 
-
-  
 jobs:
   unit-testing:
     name: Unit Testing
@@ -37,14 +35,11 @@ jobs:
         with:
           node-version: ${{ matrix.node_version }}
 
-      - name: Caching NPM Dependencies to speed up workflow
-        uses: actions/cache@v4
+      # Using Custom Composite Actions
+      - name: Composite Action - NPM Caching and Installing NPM Packages
+        uses: ./.github/custom-actions/npm-action
         with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
-
-      - name: Installing Project Dependencies
-        run: npm install
+          path-of-folder: node_modules
 
       - name: Unit Testing
         id: unit_test # It will be helpful when we want to executed next step based on output of this step.
@@ -76,14 +71,11 @@ jobs:
         with:
           node-version: 18
 
-      - name: Caching NPM Dependencies to speed up workflow
-        uses: actions/cache@v4
+      # Using Composite Custom Action
+      - name: Composite Action - NPM Caching and Installing NPM Packages
+        uses: ./.github/custom-actions/npm-action
         with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
-
-      - name: Installing Project Dependencies
-        run: npm install
+          path-of-folder: node_modules
 
       # As Code Coverage will failed coz it required 90% but we got 89%;
       # But We don't want to stop the execution if this step failed.
@@ -135,9 +127,9 @@ jobs:
           AWS_S3_BUCKET: solar-system-reports-bucket
           AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ vars.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: 'us-east-1'
-          SOURCE_DIR: 'reports-${{ github.sha }}'
-          DEST_DIR: 'reports-${{ github.sha }}'
+          AWS_REGION: "us-east-1"
+          SOURCE_DIR: "reports-${{ github.sha }}"
+          DEST_DIR: "reports-${{ github.sha }}"
 
   docker:
     name: Containerization of Application
@@ -203,10 +195,10 @@ jobs:
     if: contains(github.ref, 'feature/')
     name: Deployed to Dev Enviroment
     needs: docker
-    # It takes the ref of development/prod level envs for this job. 
+    # It takes the ref of development/prod level envs for this job.
     # You need to create ENV in github setting with their associated env
-    # Like prod envs will be different from dev envs. 
-    environment: 
+    # Like prod envs will be different from dev envs.
+    environment:
       name: development
       url: https://${{ steps.set_ingress_host.outputs.APP_INGRESS_HOST }}
     # Output is helpfull in passing value from one job to another job
@@ -250,8 +242,8 @@ jobs:
       - name: Check Deployment Files with ENVs Updates
         run: cat kubernetes/development/*.yaml
 
-    # Here; you need to create tls self signed certficate for create below secret used in ingress service. 
-      - name: Create Requierd Secrets 
+      # Here; you need to create tls self signed certficate for create below secret used in ingress service.
+      - name: Create Requierd Secrets
         run: |-
           kubectl -n ${{ vars.NAMESPACE }} create secret generic mongo-db-creds \
             --from-literal=MONGO_URI=${{ env.MONGO_URI }} \
@@ -261,7 +253,7 @@ jobs:
             --namespace ${{ vars.NAMESPACE }} \
             --key server.key \
             --cert server.crt
-      
+
       - name: Deploy menifests files to dev env
         run: |-
           kubectl apply -f kubernetes/development
@@ -270,7 +262,7 @@ jobs:
         id: set_ingress_host
         run: |-
           echo "APP_INGRESS_HOST=$(kubectl -n ${{ vars.NAMESPACE }} get ingress -o jsonpath="{.items[0].spec.tls[0].hosts[0]}")" >> $GITHUB_OUTPUT
- 
+
   dev-integration-testing:
     if: contains(github.ref, 'feature/')
     name: Dev Integration Testing
@@ -290,10 +282,10 @@ jobs:
     if: github.ref == 'refs/heads/main'
     name: Deployed to Production Env
     needs: docker
-    # It takes the ref of development/prod level envs for this job. 
+    # It takes the ref of development/prod level envs for this job.
     # You need to create ENV in github setting with their associated env
-    # Like prod envs will be different from dev envs. 
-    environment: 
+    # Like prod envs will be different from dev envs.
+    environment:
       name: production
       url: https://${{ steps.set_ingress_host.outputs.APP_INGRESS_HOST }}
     # Output is helpfull in passing value from one job to another job
@@ -337,8 +329,8 @@ jobs:
       - name: Check Deployment Files with ENVs Updates
         run: cat kubernetes/production/*.yaml
 
-    # Here; you need to create tls self signed certficate for create below secret used in ingress service. 
-      - name: Create Required Secrets 
+      # Here; you need to create tls self signed certficate for create below secret used in ingress service.
+      - name: Create Required Secrets
         run: |-
           kubectl -n ${{ vars.NAMESPACE }} create secret generic mongo-db-creds \
             --from-literal=MONGO_URI=${{ env.MONGO_URI }} \
@@ -348,7 +340,7 @@ jobs:
             --namespace ${{ vars.NAMESPACE }} \
             --key server.key \
             --cert server.crt
-      
+
       - name: Deploy menifests files to prod env
         run: |-
           kubectl apply -f kubernetes/production
@@ -357,7 +349,7 @@ jobs:
         id: set_ingress_host
         run: |-
           echo "APP_INGRESS_HOST=$(kubectl -n ${{ vars.NAMESPACE }} get ingress -o jsonpath="{.items[0].spec.tls[0].hosts[0]}")" >> $GITHUB_OUTPUT
- 
+
   prod-integration-testing:
     if: github.ref == 'refs/heads/main'
     name: Prod Integration Testing
@@ -382,10 +374,8 @@ jobs:
       - name: Sent Notification to Slack
         uses: rtCamp/action-slack-notify@v2
         env:
-          SLACK_USERNAME: 'Nirdesh'
+          SLACK_USERNAME: "Nirdesh"
           SLACK_CHANNEL: github-action-channel
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_TITLE: Information
-          SLACK_MESSAGE: ':hammer_and_wrench Triggered by ${{github.actor}}'
-
-  
+          SLACK_MESSAGE: ":hammer_and_wrench Triggered by ${{github.actor}}"

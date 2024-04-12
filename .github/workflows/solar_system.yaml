@@ -99,6 +99,39 @@ jobs:
           path: coverage
           retention-days: 5
 
+  upload-reports-to-s3:
+    name: Test Reports require upload to s3
+    runs-on: ubuntu-latest
+    needs: [code-coverage, unit-testing]
+    continue-on-error: true
+    steps:
+      - name: Download Test Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: Coverage-Test-Results
+
+      - name: Download Coverage Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: Mocha-Test-Result
+
+      - name: Merging Above Artifacts in single folder
+        run: |-
+          echo ".... Listing Files ..."
+          ls -ltr
+          echo "... Creating Folder ..."
+          mkdir reports-${{ github.sha }}
+          echo "... Moving Files to Folders ..."
+          mv test-results.xml reports-${{ github.sha }}
+          mv coverage/cobertura-coverage.xml reports-${{ github.sha }}
+          echo "... Listing New Folders Files ..."
+          ls -ltr reports-${{ github.sha }}
+
+      - name: Upload Folder to S3
+        run: |-
+          echo "Uploading to Aws S3......"
+          
+          
   docker:
     name: Containerization of Application
     runs-on: ubuntu-latest
@@ -332,3 +365,5 @@ jobs:
           echo $URL 
           echo "......................"
           curl https://$URL/live -s -k | jq -r .status | grep -i live
+
+  

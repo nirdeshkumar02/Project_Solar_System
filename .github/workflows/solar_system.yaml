@@ -138,7 +138,6 @@ jobs:
           AWS_REGION: 'us-east-1'
           SOURCE_DIR: 'reports-${{ github.sha }}'
           DEST_DIR: 'reports-${{ github.sha }}'
-          
 
   docker:
     name: Containerization of Application
@@ -373,5 +372,20 @@ jobs:
           echo $URL 
           echo "......................"
           curl https://$URL/live -s -k | jq -r .status | grep -i live
+
+  slack-notify:
+    name: Sent Notification to Slack
+    needs: [dev-integration-testing, prod-integration-testing]
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sent Notification to Slack
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_USERNAME: 'Nirdesh'
+          SLACK_CHANNEL: github-action-channel
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_TITLE: Information
+          SLACK_MESSAGE: ':hammer_and_wrench Triggered by ${{github.actor}}'
 
   

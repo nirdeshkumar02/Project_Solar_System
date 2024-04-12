@@ -123,7 +123,7 @@ jobs:
           mkdir reports-${{ github.sha }}
           echo "... Moving Files to Folders ..."
           mv test-results.xml reports-${{ github.sha }}
-          mv coverage/cobertura-coverage.xml reports-${{ github.sha }}
+          mv cobertura-coverage.xml reports-${{ github.sha }}
           echo "... Listing New Folders Files ..."
           ls -ltr reports-${{ github.sha }}
 
